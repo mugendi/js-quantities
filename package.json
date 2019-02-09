@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/mugendi/js-quantities#readme",
   "dependencies": {
+    "arrify": "^1.0.1",
     "lodash": "^4.17.4"
   }
 }

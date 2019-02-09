@@ -11,49 +11,86 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 /*jshint eqeqeq:true, immed:true, undef:true */
 /*global module:false, define:false */
 
-var _=require('lodash');
+const _ = require("lodash"),
+  arrify = require("arrify");
 
-(function (root, factory) {
-    "use strict";
-
-    if (typeof exports === "object") {
-        // Node. Does not work with strict CommonJS, but
-        // only CommonJS-like enviroments that support module.exports,
-        // like Node.
-        module.exports = factory();
-    } else if (typeof define === "function" && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(factory);
-    } else {
-        // Browser globals
-        root.Qty = factory();
-    }
-}(this, function() {
+(function(root, factory) {
   "use strict";
 
-  var UNITS = require('./data/units.js');
+  if (typeof exports === "object") {
+    // Node. Does not work with strict CommonJS, but
+    // only CommonJS-like enviroments that support module.exports,
+    // like Node.
+    module.exports = factory();
+  } else if (typeof define === "function" && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(factory);
+  } else {
+    // Browser globals
+    root.Qty = factory();
+  }
+})(this, function() {
+  "use strict";
 
-  var BASE_UNITS = ["<meter>","<kilogram>","<second>","<mole>", "<farad>", "<ampere>","<radian>","<kelvin>","<temp-K>","<byte>","<dollar>","<candela>","<each>","<steradian>","<decibel>"];
+  var UNITS = require("./data/units.js");
+
+  var BASE_UNITS = [
+    "<meter>",
+    "<kilogram>",
+    "<second>",
+    "<mole>",
+    "<farad>",
+    "<ampere>",
+    "<radian>",
+    "<kelvin>",
+    "<temp-K>",
+    "<byte>",
+    "<dollar>",
+    "<candela>",
+    "<each>",
+    "<steradian>",
+    "<decibel>"
+  ];
   var UNITY = "<1>";
-  var UNITY_ARRAY= [UNITY];
-  var NUMERATED_UNITS={}
+  var UNITY_ARRAY = [UNITY];
+  var NUMERATED_UNITS = {};
   var SIGN = "[+-]";
   var INTEGER = "\\d+";
   var SIGNED_INTEGER = SIGN + "?" + INTEGER;
   var FRACTION = "\\." + INTEGER;
-  var FLOAT = "(?:" + INTEGER + "(?:" + FRACTION + ")?" + ")" +
-              "|" +
-              "(?:" + FRACTION + ")";
+  var FLOAT =
+    "(?:" +
+    INTEGER +
+    "(?:" +
+    FRACTION +
+    ")?" +
+    ")" +
+    "|" +
+    "(?:" +
+    FRACTION +
+    ")";
   var EXPONENT = "[Ee]" + SIGNED_INTEGER;
   var SCI_NUMBER = "(?:" + FLOAT + ")(?:" + EXPONENT + ")?";
   var SIGNED_NUMBER = SIGN + "?\\s*" + SCI_NUMBER;
-  var QTY_STRING = "(" + SIGNED_NUMBER + ")?" + "\\s*([^/]*)(?:\/(.+))?";
+  var QTY_STRING = "(" + SIGNED_NUMBER + ")?" + "\\s*([^/]*)(?:/(.+))?";
   var QTY_STRING_REGEX = new RegExp("^" + QTY_STRING + "$");
   var POWER_OP = "\\^|\\*{2}";
-  var TOP_REGEX = new RegExp ("([^ \\*]+?)(?:" + POWER_OP + ")?(-?\\d+)");
+  var TOP_REGEX = new RegExp("([^ \\*]+?)(?:" + POWER_OP + ")?(-?\\d+)");
   var BOTTOM_REGEX = new RegExp("([^ \\*]+?)(?:" + POWER_OP + ")?(\\d+)");
 
-  var SIGNATURE_VECTOR = ["length", "time", "temperature", "mass", "current", "substance", "luminosity", "currency", "memory", "angle", "capacitance"];
+  var SIGNATURE_VECTOR = [
+    "length",
+    "time",
+    "temperature",
+    "mass",
+    "current",
+    "substance",
+    "luminosity",
+    "currency",
+    "memory",
+    "angle",
+    "capacitance"
+  ];
   var KINDS = {
     "-312058": "resistance",
     "-312038": "inductance",
@@ -99,7 +136,7 @@ var _=require('lodash');
   function Qty(initValue) {
     assertValidInitializationValueType(initValue);
 
-    if(!(isQty(this))) {
+    if (!isQty(this)) {
       return new Qty(initValue);
     }
 
@@ -112,22 +149,35 @@ var _=require('lodash');
 
     if (isDefinitionObject(initValue)) {
       this.scalar = initValue.scalar;
-      this.numerator = (initValue.numerator && initValue.numerator.length !== 0)? initValue.numerator : UNITY_ARRAY;
-      this.denominator = (initValue.denominator && initValue.denominator.length !== 0)? initValue.denominator : UNITY_ARRAY;
-    }
-    else {
+      this.numerator =
+        initValue.numerator && initValue.numerator.length !== 0
+          ? initValue.numerator
+          : UNITY_ARRAY;
+      this.denominator =
+        initValue.denominator && initValue.denominator.length !== 0
+          ? initValue.denominator
+          : UNITY_ARRAY;
+    } else {
       parse.call(this, initValue);
     }
 
     // math with temperatures is very limited
-    if(this.denominator.join("*").indexOf("temp") >= 0) {
+    if (
+      arrify(this.denominator)
+        .join("*")
+        .indexOf("temp") >= 0
+    ) {
       throw new QtyError("Cannot divide with temperatures");
     }
-    if(this.numerator.join("*").indexOf("temp") >= 0) {
-      if(this.numerator.length > 1) {
+    if (
+      arrify(this.numerator)
+        .join("*")
+        .indexOf("temp") >= 0
+    ) {
+      if (this.numerator.length > 1) {
         throw new QtyError("Cannot multiply by temperatures");
       }
-      if(!compareArray(this.denominator, UNITY_ARRAY)) {
+      if (!compareArray(this.denominator, UNITY_ARRAY)) {
         throw new QtyError("Cannot divide with temperatures");
       }
     }
@@ -135,7 +185,7 @@ var _=require('lodash');
     this.initValue = initValue;
     updateBaseScalar.call(this);
 
-    if(this.isTemperature() && this.baseScalar < 0) {
+    if (this.isTemperature() && this.baseScalar < 0) {
       throw new QtyError("Temperatures must not be less than absolute zero");
     }
   }
@@ -147,14 +197,13 @@ var _=require('lodash');
    * @returns {Qty|null} Parsed quantity or null if unrecognized
    */
   Qty.parse = function parse(value) {
-    if(!isString(value)) {
+    if (!isString(value)) {
       throw new QtyError("Argument should be a string");
     }
 
     try {
       return Qty(value);
-    }
-    catch(e) {
+    } catch (e) {
       return null;
     }
   };
@@ -185,17 +234,16 @@ var _=require('lodash');
     var srcQty = Qty(srcUnits);
     var dstQty = Qty(dstUnits);
 
-    if(srcQty.eq(dstQty)) {
+    if (srcQty.eq(dstQty)) {
       return identity;
     }
 
     var convert;
-    if(!srcQty.isTemperature()) {
+    if (!srcQty.isTemperature()) {
       convert = function(value) {
-        return value * srcQty.baseScalar / dstQty.baseScalar;
+        return (value * srcQty.baseScalar) / dstQty.baseScalar;
       };
-    }
-    else {
+    } else {
       convert = function(value) {
         // TODO Not optimized
         return srcQty.mul(value).to(dstQty).scalar;
@@ -203,16 +251,13 @@ var _=require('lodash');
     }
 
     return function converter(value) {
-      var i,
-          length,
-          result;
-      if(!Array.isArray(value)) {
+      var i, length, result;
+      if (!Array.isArray(value)) {
         return convert(value);
-      }
-      else {
+      } else {
         length = value.length;
         result = [];
-        for(i = 0; i < length; i++) {
+        for (i = 0; i < length; i++) {
           result.push(convert(value[i]));
         }
         return result;
@@ -227,25 +272,24 @@ var _=require('lodash');
    * @returns {string[]} names of kinds of units
    */
   Qty.getKinds = function() {
-    var knownKinds = Object.keys(KINDS).map(function(knownSignature) {
-      return KINDS[knownSignature];
-    }).sort();
+    var knownKinds = Object.keys(KINDS)
+      .map(function(knownSignature) {
+        return KINDS[knownSignature];
+      })
+      .sort();
     return KINDS;
   };
-  
+
   Qty.getUnits = function(qty) {
+    var units = [];
 
-     var units=[]; 
+    for (var numerator in UNITS) {
+      UNITS[numerator][0].forEach(function(unit) {
+        NUMERATED_UNITS[unit] = numerator;
+      });
+    }
 
-     for(var numerator in UNITS){
-        UNITS[numerator][0].forEach(function(unit){
-          NUMERATED_UNITS[unit]=numerator;
-        });
-     }
-
-     
-      
-     return _.keys(NUMERATED_UNITS);
+    return _.keys(NUMERATED_UNITS);
   };
 
   /**
@@ -273,16 +317,15 @@ var _=require('lodash');
    */
   Qty.formatter = defaultFormatter;
 
-  var updateBaseScalar = function () {
-    if(this.baseScalar) {
+  var updateBaseScalar = function() {
+    if (this.baseScalar) {
       return this.baseScalar;
     }
 
-    if(this.isBase()) {
+    if (this.isBase()) {
       this.baseScalar = this.scalar;
       this.signature = unitSignature.call(this);
-    }
-    else {
+    } else {
       var base = this.toBase();
       this.baseScalar = base.scalar;
       this.signature = base.signature;
@@ -298,42 +341,44 @@ var _=require('lodash');
   doi://10.1109/32.403789
   http://ieeexplore.ieee.org/Xplore/login.jsp?url=/iel1/32/9079/00403789.pdf?isnumber=9079&prod=JNL&arnumber=403789&arSt=651&ared=661&arAuthor=Novak%2C+G.S.%2C+Jr.
   */
-  var unitSignature = function () {
-    if(this.signature) {
+  var unitSignature = function() {
+    if (this.signature) {
       return this.signature;
     }
     var vector = unitSignatureVector.call(this);
-    for(var i = 0; i < vector.length; i++) {
+    for (var i = 0; i < vector.length; i++) {
       vector[i] *= Math.pow(20, i);
     }
 
-    return vector.reduce(function(previous, current) {return previous + current;}, 0);
+    return vector.reduce(function(previous, current) {
+      return previous + current;
+    }, 0);
   };
 
   // calculates the unit signature vector used by unit_signature
-  var unitSignatureVector = function () {
-    if(!this.isBase()) {
+  var unitSignatureVector = function() {
+    if (!this.isBase()) {
       return unitSignatureVector.call(this.toBase());
     }
 
     var vector = new Array(SIGNATURE_VECTOR.length);
-    for(var i = 0; i < vector.length; i++) {
+    for (var i = 0; i < vector.length; i++) {
       vector[i] = 0;
     }
     var r, n;
-    for(var j = 0; j < this.numerator.length; j++) {
-      if((r = UNITS[this.numerator[j]])) {
+    for (var j = 0; j < this.numerator.length; j++) {
+      if ((r = UNITS[this.numerator[j]])) {
         n = SIGNATURE_VECTOR.indexOf(r[2]);
-        if(n >= 0) {
+        if (n >= 0) {
           vector[n] = vector[n] + 1;
         }
       }
     }
 
-    for(var k = 0; k < this.denominator.length; k++) {
-      if((r = UNITS[this.denominator[k]])) {
+    for (var k = 0; k < this.denominator.length; k++) {
+      if ((r = UNITS[this.denominator[k]])) {
         n = SIGNATURE_VECTOR.indexOf(r[2]);
-        if(n >= 0) {
+        if (n >= 0) {
           vector[n] = vector[n] - 1;
         }
       }
@@ -353,7 +398,7 @@ var _=require('lodash');
    * 6'4"  -- recognized as 6 feet + 4 inches
    * 8 lbs 8 oz -- recognized as 8 lbs + 8 ounces
    */
-  var parse = function (val) {
+  var parse = function(val) {
     if (!isString(val)) {
       val = val.toString();
     }
@@ -363,17 +408,16 @@ var _=require('lodash');
     }
 
     var result = QTY_STRING_REGEX.exec(val);
-    if(!result) {
+    if (!result) {
       throw new QtyError(val + ": Quantity not recognized");
     }
 
     var scalarMatch = result[1];
-    if(scalarMatch) {
+    if (scalarMatch) {
       // Allow whitespaces between sign and scalar for loose parsing
       scalarMatch = scalarMatch.replace(/\s/g, "");
       this.scalar = parseFloat(scalarMatch);
-    }
-    else {
+    } else {
       this.scalar = 1;
     }
     var top = result[2];
@@ -381,56 +425,54 @@ var _=require('lodash');
 
     var n, x, nx;
     // TODO DRY me
-    while((result = TOP_REGEX.exec(top))) {
+    while ((result = TOP_REGEX.exec(top))) {
       n = parseFloat(result[2]);
-      if(isNaN(n)) {
+      if (isNaN(n)) {
         // Prevents infinite loops
         throw new QtyError("Unit exponent is not a number");
       }
       // Disallow unrecognized unit even if exponent is 0
-      if(n === 0 && !UNIT_TEST_REGEX.test(result[1])) {
+      if (n === 0 && !UNIT_TEST_REGEX.test(result[1])) {
         throw new QtyError("Unit not recognized");
       }
       x = result[1] + " ";
       nx = "";
-      for(var i = 0; i < Math.abs(n) ; i++) {
+      for (var i = 0; i < Math.abs(n); i++) {
         nx += x;
       }
-      if(n >= 0) {
+      if (n >= 0) {
         top = top.replace(result[0], nx);
-      }
-      else {
+      } else {
         bottom = bottom ? bottom + nx : nx;
         top = top.replace(result[0], "");
       }
     }
 
-    while((result = BOTTOM_REGEX.exec(bottom))) {
+    while ((result = BOTTOM_REGEX.exec(bottom))) {
       n = parseFloat(result[2]);
-      if(isNaN(n)) {
+      if (isNaN(n)) {
         // Prevents infinite loops
         throw new QtyError("Unit exponent is not a number");
       }
       // Disallow unrecognized unit even if exponent is 0
-      if(n === 0 && !UNIT_TEST_REGEX.test(result[1])) {
+      if (n === 0 && !UNIT_TEST_REGEX.test(result[1])) {
         throw new QtyError("Unit not recognized");
       }
       x = result[1] + " ";
       nx = "";
-      for(var j = 0; j < n ; j++) {
+      for (var j = 0; j < n; j++) {
         nx += x;
       }
 
       bottom = bottom.replace(result[0], nx, "g");
     }
 
-    if(top) {
+    if (top) {
       this.numerator = parseUnits(top.trim());
     }
-    if(bottom) {
+    if (bottom) {
       this.denominator = parseUnits(bottom.trim());
     }
-
   };
 
   /*
@@ -443,22 +485,26 @@ var _=require('lodash');
   }
 
   Qty.prototype = {
-
     // Properly set up constructor
     constructor: Qty,
 
     // Converts the unit back to a float if it is unitless.  Otherwise raises an exception
     toFloat: function() {
-      if(this.isUnitless()) {
+      if (this.isUnitless()) {
         return this.scalar;
       }
-      throw new QtyError("Can't convert to Float unless unitless.  Use Unit#scalar");
+      throw new QtyError(
+        "Can't convert to Float unless unitless.  Use Unit#scalar"
+      );
     },
 
     // returns true if no associated units
     // false, even if the units are "unitless" like 'radians, each, etc'
     isUnitless: function() {
-      return compareArray(this.numerator, UNITY_ARRAY) && compareArray(this.denominator, UNITY_ARRAY);
+      return (
+        compareArray(this.numerator, UNITY_ARRAY) &&
+        compareArray(this.denominator, UNITY_ARRAY)
+      );
     },
 
     /*
@@ -471,18 +517,17 @@ var _=require('lodash');
     unit.units =~ /regexp/
     */
     isCompatible: function(other) {
-      if(isString(other)) {
+      if (isString(other)) {
         return this.isCompatible(Qty(other));
       }
 
-      if(!(isQty(other))) {
+      if (!isQty(other)) {
         return false;
       }
 
-      if(other.signature !== undefined) {
+      if (other.signature !== undefined) {
         return this.signature === other.signature;
-      }
-      else {
+      } else {
         return false;
       }
     },
@@ -506,20 +551,20 @@ var _=require('lodash');
 
     // Returns 'true' if the Unit is represented in base units
     isBase: function() {
-      if(this._isBase !== undefined) {
+      if (this._isBase !== undefined) {
         return this._isBase;
       }
-      if(this.isDegrees() && this.numerator[0].match(/<(kelvin|temp-K)>/)) {
+      if (this.isDegrees() && this.numerator[0].match(/<(kelvin|temp-K)>/)) {
         this._isBase = true;
         return this._isBase;
       }
 
       this.numerator.concat(this.denominator).forEach(function(item) {
-        if(item !== UNITY && BASE_UNITS.indexOf(item) === -1 ) {
+        if (item !== UNITY && BASE_UNITS.indexOf(item) === -1) {
           this._isBase = false;
         }
       }, this);
-      if(this._isBase === false) {
+      if (this._isBase === false) {
         return this._isBase;
       }
       this._isBase = true;
@@ -529,18 +574,18 @@ var _=require('lodash');
     // convert to base SI units
     // results of the conversion are cached so subsequent calls to this will be fast
     toBase: function() {
-      if(this.isBase()) {
+      if (this.isBase()) {
         return this;
       }
 
-      if(this.isTemperature()) {
+      if (this.isTemperature()) {
         return toTempK(this);
       }
 
       var cached = baseUnitCache[this.units()];
 
-      if(!cached) {
-        cached = toBaseUnits(this.numerator,this.denominator);
+      if (!cached) {
+        cached = toBaseUnits(this.numerator, this.denominator);
         baseUnitCache[this.units()] = cached;
       }
       return cached.mul(this.scalar);
@@ -548,20 +593,20 @@ var _=require('lodash');
 
     // returns the 'unit' part of the Unit object without the scalar
     units: function() {
-      if(this._units !== undefined) {
+      if (this._units !== undefined) {
         return this._units;
       }
 
       var numIsUnity = compareArray(this.numerator, UNITY_ARRAY),
-          denIsUnity = compareArray(this.denominator, UNITY_ARRAY);
-      if(numIsUnity && denIsUnity) {
+        denIsUnity = compareArray(this.denominator, UNITY_ARRAY);
+      if (numIsUnity && denIsUnity) {
         this._units = "";
         return this._units;
       }
 
       var numUnits = stringifyUnits(this.numerator),
-          denUnits = stringifyUnits(this.denominator);
-      this._units = numUnits + (denIsUnity ? "":("/" + denUnits));
+        denUnits = stringifyUnits(this.denominator);
+      this._units = numUnits + (denIsUnity ? "" : "/" + denUnits);
       return this._units;
     },
 
@@ -598,26 +643,27 @@ var _=require('lodash');
      *
      */
     toPrec: function(precQuantity) {
-      if(isString(precQuantity)) {
+      if (isString(precQuantity)) {
         precQuantity = Qty(precQuantity);
       }
-      if(isNumber(precQuantity)) {
+      if (isNumber(precQuantity)) {
         precQuantity = Qty(precQuantity + " " + this.units());
       }
 
-      if(!this.isUnitless()) {
+      if (!this.isUnitless()) {
         precQuantity = precQuantity.to(this.units());
-      }
-      else if(!precQuantity.isUnitless()) {
+      } else if (!precQuantity.isUnitless()) {
         throwIncompatibleUnits();
       }
 
-      if(precQuantity.scalar === 0) {
+      if (precQuantity.scalar === 0) {
         throw new QtyError("Divide by zero");
       }
 
-      var precRoundedResult = mulSafe(Math.round(this.scalar/precQuantity.scalar),
-                                         precQuantity.scalar);
+      var precRoundedResult = mulSafe(
+        Math.round(this.scalar / precQuantity.scalar),
+        precQuantity.scalar
+      );
 
       return Qty(precRoundedResult + this.units());
     },
@@ -638,20 +684,21 @@ var _=require('lodash');
      */
     toString: function(targetUnitsOrMaxDecimalsOrPrec, maxDecimals) {
       var targetUnits;
-      if(isNumber(targetUnitsOrMaxDecimalsOrPrec)) {
+      if (isNumber(targetUnitsOrMaxDecimalsOrPrec)) {
         targetUnits = this.units();
         maxDecimals = targetUnitsOrMaxDecimalsOrPrec;
-      }
-      else if(isString(targetUnitsOrMaxDecimalsOrPrec)) {
+      } else if (isString(targetUnitsOrMaxDecimalsOrPrec)) {
         targetUnits = targetUnitsOrMaxDecimalsOrPrec;
-      }
-      else if(isQty(targetUnitsOrMaxDecimalsOrPrec)) {
-        return this.toPrec(targetUnitsOrMaxDecimalsOrPrec).toString(maxDecimals);
+      } else if (isQty(targetUnitsOrMaxDecimalsOrPrec)) {
+        return this.toPrec(targetUnitsOrMaxDecimalsOrPrec).toString(
+          maxDecimals
+        );
       }
 
       var out = this.to(targetUnits);
 
-      var outScalar = maxDecimals !== undefined ? round(out.scalar, maxDecimals) : out.scalar;
+      var outScalar =
+        maxDecimals !== undefined ? round(out.scalar, maxDecimals) : out.scalar;
       out = (outScalar + " " + out.units()).trim();
       return out;
     },
@@ -684,8 +731,8 @@ var _=require('lodash');
      * @returns {string} quantity as string
      */
     format: function(targetUnits, formatter) {
-      if(arguments.length === 1) {
-        if(typeof targetUnits === "function") {
+      if (arguments.length === 1) {
+        if (typeof targetUnits === "function") {
           formatter = targetUnits;
           targetUnits = undefined;
         }
@@ -709,19 +756,17 @@ var _=require('lodash');
     //
     //   If including inverses in the sort is needed, I suggest writing: Qty.sort(qtyArray,units)
     compareTo: function(other) {
-      if(isString(other)) {
+      if (isString(other)) {
         return this.compareTo(Qty(other));
       }
-      if(!this.isCompatible(other)) {
+      if (!this.isCompatible(other)) {
         throwIncompatibleUnits();
       }
-      if(this.baseScalar < other.baseScalar) {
+      if (this.baseScalar < other.baseScalar) {
         return -1;
-      }
-      else if(this.baseScalar === other.baseScalar) {
+      } else if (this.baseScalar === other.baseScalar) {
         return 0;
-      }
-      else if(this.baseScalar > other.baseScalar) {
+      } else if (this.baseScalar > other.baseScalar) {
         return 1;
       }
     },
@@ -730,26 +775,33 @@ var _=require('lodash');
     // Unit("100 cm").same(Unit("100 cm"))  # => true
     // Unit("100 cm").same(Unit("1 m"))     # => false
     same: function(other) {
-      return (this.scalar === other.scalar) && (this.units() === other.units());
+      return this.scalar === other.scalar && this.units() === other.units();
     },
 
     // Returns a Qty that is the inverse of this Qty,
     inverse: function() {
-      if(this.isTemperature()) {
+      if (this.isTemperature()) {
         throw new QtyError("Cannot divide with temperatures");
       }
-      if(this.scalar === 0) {
+      if (this.scalar === 0) {
         throw new QtyError("Divide by zero");
       }
-      return Qty({"scalar": 1/this.scalar, "numerator": this.denominator, "denominator": this.numerator});
+      return Qty({
+        scalar: 1 / this.scalar,
+        numerator: this.denominator,
+        denominator: this.numerator
+      });
     },
 
     isDegrees: function() {
       // signature may not have been calculated yet
-      return (this.signature === null || this.signature === 400) &&
+      return (
+        (this.signature === null || this.signature === 400) &&
         this.numerator.length === 1 &&
         compareArray(this.denominator, UNITY_ARRAY) &&
-        (this.numerator[0].match(/<temp-[CFRK]>/) || this.numerator[0].match(/<(kelvin|celsius|rankine|fahrenheit)>/));
+        (this.numerator[0].match(/<temp-[CFRK]>/) ||
+          this.numerator[0].match(/<(kelvin|celsius|rankine|fahrenheit)>/))
+      );
     },
 
     isTemperature: function() {
@@ -775,43 +827,43 @@ var _=require('lodash');
     to: function(other) {
       var cached, target;
 
-      if(!other) {
+      if (!other) {
         return this;
       }
 
-      if(!isString(other)) {
+      if (!isString(other)) {
         return this.to(other.units());
       }
 
       cached = this._conversionCache[other];
-      if(cached) {
+      if (cached) {
         return cached;
       }
 
       // Instantiating target to normalize units
       target = Qty(other);
-      if(target.units() === this.units()) {
+      if (target.units() === this.units()) {
         return this;
       }
 
-      if(!this.isCompatible(target)) {
-        if(this.isInverse(target)) {
+      if (!this.isCompatible(target)) {
+        if (this.isInverse(target)) {
           target = this.inverse().to(other);
-        }
-        else {
+        } else {
           throwIncompatibleUnits();
         }
-      }
-      else {
-        if(target.isTemperature()) {
-          target = toTemp(this,target);
-        }
-        else if(target.isDegrees()) {
-          target = toDegrees(this,target);
-        }
-        else {
+      } else {
+        if (target.isTemperature()) {
+          target = toTemp(this, target);
+        } else if (target.isDegrees()) {
+          target = toDegrees(this, target);
+        } else {
           var q = divSafe(this.baseScalar, target.baseScalar);
-          target = Qty({"scalar": q, "numerator": target.numerator, "denominator": target.denominator});
+          target = Qty({
+            scalar: q,
+            numerator: target.numerator,
+            denominator: target.denominator
+          });
         }
       }
 
@@ -820,139 +872,153 @@ var _=require('lodash');
     },
 
     toAll: function(inAllUnits) {
-        inAllUnits=inAllUnits || true;
+      inAllUnits = inAllUnits || true;
 
-        var converted={},
-           all=[],
-           unit='';
+      var converted = {},
+        all = [],
+        unit = "";
 
-       var signature=KINDS[this.signature.toString()];
-       var all_units={}
-       var unit=this.initValue.replace(/[^a-z]+/ig,'');
-       var units=[];
-       var numerator=this.numerator.pop();
+      var signature = KINDS[this.signature.toString()];
+      var all_units = {};
+      var unit = this.initValue.replace(/[^a-z]+/gi, "");
+      var units = [];
+      var numerator = this.numerator.pop();
 
-       all_units[this._units]=UNITS[numerator][0];
+      all_units[this._units] = arrify(UNITS[numerator])[0];
 
-        //loop thru all the available UNITs
-        for(var key in UNITS){
+      //loop thru all the available UNITs
+      for (var key in UNITS) {
+        //only use UNITS with matching signatures
+        if (signature == UNITS[key][2]) {
+          unit = arrify(UNITS[key][0])[0];
 
-            //only use UNITS with matching signatures
-            if(signature==UNITS[key][2]){
-                unit=UNITS[key][0][0];
+          //if compatible unit
+          if (this.isCompatible(unit)) {
+            this.to(unit);
+            all_units[unit] = UNITS[key][0];
+          }
+        }
+      }
 
-                //if compatible unit
-                if(this.isCompatible(unit)){
-                    this.to(unit)    
-                    all_units[unit]=UNITS[key][0] ;      
-                }
-              
-            }
+      if (inAllUnits) {
+        units = _.uniq(
+          arrify(all_units[this._units])
+            .join("|")
+            .split("|")
+        );
 
+        var all = [
+          {
+            val: this.scalar,
+            units: units,
+            str: this.scalar.format() + " (" + arrify(units).join("|") + ")"
+          }
+        ];
+      } else {
+        var all = [
+          {
+            scalar: this.scalar,
+            baseScalar: this.baseScalar,
+            signature: this.signature,
+            numerator: this.numerator,
+            denominator: this.denominator,
+            initValue: this.initValue,
+            _isBase: this._isBase,
+            _units: this._units
+          }
+        ];
+      }
+
+      for (var key in this._conversionCache) {
+        var val = this._conversionCache[key];
+
+        if (inAllUnits) {
+          units = _.uniq(
+            arrify(all_units[key])
+              .join("|")
+              .split("|")
+          );
+
+          val = {
+            val: val.scalar,
+            units: units,
+            str: val.scalar.format() + " (" + arrify(units).join("|") + ")"
+          };
         }
 
-        if(inAllUnits){
-          units=_.uniq(all_units[this._units].join('|').split('|'));
-          var all=[{
-                    val:this.scalar,
-                    units:units,
-                    str: this.scalar.toString() +' ('+units.join('|')+')'
-                  }];
-          // console.log(all);
-        }
+        all.push(val);
+      }
 
-        else{
-            var all = [
-                {
-                  scalar: this.scalar,
-                  baseScalar: this.baseScalar,
-                  signature: this.signature,
-                  numerator: this.numerator,
-                  denominator: this.denominator,
-                  initValue: this.initValue,
-                  _isBase: this._isBase,
-                  _units: this._units
-                }
-            ];
-        }
-
-        for(var key in this._conversionCache){
-
-            var val=this._conversionCache[key]
-
-            if(inAllUnits){
-              units=_.uniq(all_units[key].join('|').split('|'));
-
-              val={
-                val:val.scalar,
-                units:units,
-                str: val.scalar.toString() +' ('+units.join('|')+')'
-              }
-            }
-
-            all.push(val)
-
-        }
-
-
-        return all;
+      return all;
     },
 
     // Quantity operators
     // Returns new instance with this units
     add: function(other) {
-      if(isString(other)) {
+      if (isString(other)) {
         other = Qty(other);
       }
 
-      if(!this.isCompatible(other)) {
+      if (!this.isCompatible(other)) {
         throwIncompatibleUnits();
       }
 
-      if(this.isTemperature() && other.isTemperature()) {
+      if (this.isTemperature() && other.isTemperature()) {
         throw new QtyError("Cannot add two temperatures");
-      }
-      else if(this.isTemperature()) {
-        return addTempDegrees(this,other);
-      }
-      else if(other.isTemperature()) {
-        return addTempDegrees(other,this);
+      } else if (this.isTemperature()) {
+        return addTempDegrees(this, other);
+      } else if (other.isTemperature()) {
+        return addTempDegrees(other, this);
       }
 
-      return Qty({"scalar": this.scalar + other.to(this).scalar, "numerator": this.numerator, "denominator": this.denominator});
+      return Qty({
+        scalar: this.scalar + other.to(this).scalar,
+        numerator: this.numerator,
+        denominator: this.denominator
+      });
     },
 
     sub: function(other) {
-      if(isString(other)) {
+      if (isString(other)) {
         other = Qty(other);
       }
 
-      if(!this.isCompatible(other)) {
+      if (!this.isCompatible(other)) {
         throwIncompatibleUnits();
       }
 
-      if(this.isTemperature() && other.isTemperature()) {
-        return subtractTemperatures(this,other);
-      }
-      else if(this.isTemperature()) {
-        return subtractTempDegrees(this,other);
-      }
-      else if(other.isTemperature()) {
-        throw new QtyError("Cannot subtract a temperature from a differential degree unit");
+      if (this.isTemperature() && other.isTemperature()) {
+        return subtractTemperatures(this, other);
+      } else if (this.isTemperature()) {
+        return subtractTempDegrees(this, other);
+      } else if (other.isTemperature()) {
+        throw new QtyError(
+          "Cannot subtract a temperature from a differential degree unit"
+        );
       }
 
-      return Qty({"scalar": this.scalar - other.to(this).scalar, "numerator": this.numerator, "denominator": this.denominator});
+      return Qty({
+        scalar: this.scalar - other.to(this).scalar,
+        numerator: this.numerator,
+        denominator: this.denominator
+      });
     },
 
     mul: function(other) {
-      if(isNumber(other)) {
-        return Qty({"scalar": mulSafe(this.scalar, other), "numerator": this.numerator, "denominator": this.denominator});
-      }
-      else if(isString(other)) {
+      if (isNumber(other)) {
+        return Qty({
+          scalar: mulSafe(this.scalar, other),
+          numerator: this.numerator,
+          denominator: this.denominator
+        });
+      } else if (isString(other)) {
         other = Qty(other);
       }
 
-      if((this.isTemperature()||other.isTemperature()) && !(this.isUnitless()||other.isUnitless())) {
+      if (
+        (this.isTemperature() || other.isTemperature()) &&
+        !(this.isUnitless() || other.isUnitless())
+      ) {
         throw new QtyError("Cannot multiply by temperatures");
       }
 
@@ -962,33 +1028,42 @@ var _=require('lodash');
 
       // so as not to confuse results, multiplication and division between temperature degrees will maintain original unit info in num/den
       // multiplication and division between deg[CFRK] can never factor each other out, only themselves: "degK*degC/degC^2" == "degK/degC"
-      if(op1.isCompatible(op2) && op1.signature !== 400) {
+      if (op1.isCompatible(op2) && op1.signature !== 400) {
         op2 = op2.to(op1);
       }
-      var numden = cleanTerms(op1.numerator.concat(op2.numerator), op1.denominator.concat(op2.denominator));
+      var numden = cleanTerms(
+        op1.numerator.concat(op2.numerator),
+        op1.denominator.concat(op2.denominator)
+      );
 
-      return Qty({"scalar": mulSafe(op1.scalar, op2.scalar) , "numerator": numden[0], "denominator": numden[1]});
+      return Qty({
+        scalar: mulSafe(op1.scalar, op2.scalar),
+        numerator: numden[0],
+        denominator: numden[1]
+      });
     },
 
     div: function(other) {
-      if(isNumber(other)) {
-        if(other === 0) {
+      if (isNumber(other)) {
+        if (other === 0) {
           throw new QtyError("Divide by zero");
         }
-        return Qty({"scalar": this.scalar / other, "numerator": this.numerator, "denominator": this.denominator});
-      }
-      else if(isString(other)) {
+        return Qty({
+          scalar: this.scalar / other,
+          numerator: this.numerator,
+          denominator: this.denominator
+        });
+      } else if (isString(other)) {
         other = Qty(other);
       }
 
-      if(other.scalar === 0) {
+      if (other.scalar === 0) {
         throw new QtyError("Divide by zero");
       }
 
-      if(other.isTemperature()) {
+      if (other.isTemperature()) {
         throw new QtyError("Cannot divide with temperatures");
-      }
-      else if(this.isTemperature() && !other.isUnitless()) {
+      } else if (this.isTemperature() && !other.isUnitless()) {
         throw new QtyError("Cannot divide with temperatures");
       }
 
@@ -998,54 +1073,58 @@ var _=require('lodash');
 
       // so as not to confuse results, multiplication and division between temperature degrees will maintain original unit info in num/den
       // multiplication and division between deg[CFRK] can never factor each other out, only themselves: "degK*degC/degC^2" == "degK/degC"
-      if(op1.isCompatible(op2) && op1.signature !== 400) {
+      if (op1.isCompatible(op2) && op1.signature !== 400) {
         op2 = op2.to(op1);
       }
-      var numden = cleanTerms(op1.numerator.concat(op2.denominator), op1.denominator.concat(op2.numerator));
+      var numden = cleanTerms(
+        op1.numerator.concat(op2.denominator),
+        op1.denominator.concat(op2.numerator)
+      );
 
-      return Qty({"scalar": op1.scalar / op2.scalar, "numerator": numden[0], "denominator": numden[1]});
+      return Qty({
+        scalar: op1.scalar / op2.scalar,
+        numerator: numden[0],
+        denominator: numden[1]
+      });
     }
-
   };
 
-  function toBaseUnits (numerator,denominator) {
+  function toBaseUnits(numerator, denominator) {
     var num = [];
     var den = [];
     var q = 1;
     var unit;
-    for(var i = 0; i < numerator.length; i++) {
+    for (var i = 0; i < numerator.length; i++) {
       unit = numerator[i];
-      if(PREFIX_VALUES[unit]) {
+      if (PREFIX_VALUES[unit]) {
         // workaround to fix
         // 0.1 * 0.1 => 0.010000000000000002
         q = mulSafe(q, PREFIX_VALUES[unit]);
-      }
-      else {
-        if(UNIT_VALUES[unit]) {
+      } else {
+        if (UNIT_VALUES[unit]) {
           q *= UNIT_VALUES[unit].scalar;
 
-          if(UNIT_VALUES[unit].numerator) {
+          if (UNIT_VALUES[unit].numerator) {
             num.push(UNIT_VALUES[unit].numerator);
           }
-          if(UNIT_VALUES[unit].denominator) {
+          if (UNIT_VALUES[unit].denominator) {
             den.push(UNIT_VALUES[unit].denominator);
           }
         }
       }
     }
-    for(var j = 0; j < denominator.length; j++) {
+    for (var j = 0; j < denominator.length; j++) {
       unit = denominator[j];
-      if(PREFIX_VALUES[unit]) {
+      if (PREFIX_VALUES[unit]) {
         q /= PREFIX_VALUES[unit];
-      }
-      else {
-        if(UNIT_VALUES[unit]) {
+      } else {
+        if (UNIT_VALUES[unit]) {
           q /= UNIT_VALUES[unit].scalar;
 
-          if(UNIT_VALUES[unit].numerator) {
+          if (UNIT_VALUES[unit].numerator) {
             den.push(UNIT_VALUES[unit].numerator);
           }
-          if(UNIT_VALUES[unit].denominator) {
+          if (UNIT_VALUES[unit].denominator) {
             num.push(UNIT_VALUES[unit].denominator);
           }
         }
@@ -1053,14 +1132,14 @@ var _=require('lodash');
     }
 
     // Flatten
-    num = num.reduce(function(a,b) {
+    num = num.reduce(function(a, b) {
       return a.concat(b);
     }, []);
-    den = den.reduce(function(a,b) {
+    den = den.reduce(function(a, b) {
       return a.concat(b);
     }, []);
 
-    return Qty({"scalar": q, "numerator": num, "denominator": den});
+    return Qty({ scalar: q, numerator: num, denominator: den });
   }
 
   var parsedUnitsCache = {};
@@ -1078,26 +1157,29 @@ var _=require('lodash');
    */
   function parseUnits(units) {
     var cached = parsedUnitsCache[units];
-    if(cached) {
+    if (cached) {
       return cached;
     }
 
-    var unitMatch, normalizedUnits = [];
+    var unitMatch,
+      normalizedUnits = [];
     // Scan
-    if(!UNIT_TEST_REGEX.test(units)) {
+    if (!UNIT_TEST_REGEX.test(units)) {
       throw new QtyError("Unit not recognized");
     }
 
-    while((unitMatch = UNIT_MATCH_REGEX.exec(units))) {
+    while ((unitMatch = UNIT_MATCH_REGEX.exec(units))) {
       normalizedUnits.push(unitMatch.slice(1));
     }
 
-    normalizedUnits = normalizedUnits.map(function(item) {
-      return PREFIX_MAP[item[0]] ? [PREFIX_MAP[item[0]], UNIT_MAP[item[1]]] : [UNIT_MAP[item[1]]];
+    normalizedUnits = arrify(normalizedUnits).map(function(item) {
+      return PREFIX_MAP[item[0]]
+        ? [PREFIX_MAP[item[0]], UNIT_MAP[item[1]]]
+        : [UNIT_MAP[item[1]]];
     });
 
     // Flatten and remove null elements
-    normalizedUnits = normalizedUnits.reduce(function(a,b) {
+    normalizedUnits = normalizedUnits.reduce(function(a, b) {
       return a.concat(b);
     }, []);
     normalizedUnits = normalizedUnits.filter(function(item) {
@@ -1112,9 +1194,8 @@ var _=require('lodash');
   function NestedMap() {}
 
   NestedMap.prototype.get = function(keys) {
-
     // Allows to pass key1, key2, ... instead of [key1, key2, ...]
-    if(arguments.length > 1) {
+    if (arguments.length > 1) {
       // Slower with Firefox but faster with Chrome than
       // Array.prototype.slice.call(arguments)
       // See http://jsperf.com/array-apply-versus-array-prototype-slice-call
@@ -1123,43 +1204,36 @@ var _=require('lodash');
 
     return keys.reduce(function(map, key, index) {
       if (map) {
-
         var childMap = map[key];
 
         if (index === keys.length - 1) {
           return childMap ? childMap.data : undefined;
-        }
-        else {
+        } else {
           return childMap;
         }
       }
-    },
-    this);
+    }, this);
   };
 
   NestedMap.prototype.set = function(keys, value) {
+    if (arguments.length > 2) {
+      keys = Array.prototype.slice.call(arguments, 0, -1);
+      value = arguments[arguments.length - 1];
+    }
 
-      if(arguments.length > 2) {
-        keys = Array.prototype.slice.call(arguments, 0, -1);
-        value = arguments[arguments.length - 1];
+    return keys.reduce(function(map, key, index) {
+      var childMap = map[key];
+      if (childMap === undefined) {
+        childMap = map[key] = {};
       }
 
-      return keys.reduce(function(map, key, index) {
-
-        var childMap = map[key];
-        if (childMap === undefined) {
-          childMap = map[key] = {};
-        }
-
-        if (index === keys.length - 1) {
-          childMap.data = value;
-          return value;
-        }
-        else {
-          return childMap;
-        }
-      },
-      this);
+      if (index === keys.length - 1) {
+        childMap.data = value;
+        return value;
+      } else {
+        return childMap;
+      }
+    }, this);
   };
 
   var stringifiedUnitsCache = new NestedMap();
@@ -1172,18 +1246,16 @@ var _=require('lodash');
    *
    */
   function stringifyUnits(units) {
-
     var stringified = stringifiedUnitsCache.get(units);
-    if(stringified) {
+    if (stringified) {
       return stringified;
     }
 
     var isUnity = compareArray(units, UNITY_ARRAY);
-    if(isUnity) {
+    if (isUnity) {
       stringified = "1";
-    }
-    else {
-      stringified = simplify(getOutputNames(units)).join("*");
+    } else {
+      stringified = arrify(simplify(getOutputNames(units))).join("*");
     }
 
     // Cache result
@@ -1193,28 +1265,29 @@ var _=require('lodash');
   }
 
   function getOutputNames(units) {
-    var unitNames = [], token, tokenNext;
-    for(var i = 0; i < units.length; i++) {
+    var unitNames = [],
+      token,
+      tokenNext;
+    for (var i = 0; i < units.length; i++) {
       token = units[i];
-      tokenNext = units[i+1];
-      if(PREFIX_VALUES[token]) {
+      tokenNext = units[i + 1];
+      if (PREFIX_VALUES[token]) {
         unitNames.push(OUTPUT_MAP[token] + OUTPUT_MAP[tokenNext]);
         i++;
-      }
-      else {
+      } else {
         unitNames.push(OUTPUT_MAP[token]);
       }
     }
     return unitNames;
   }
 
-  function simplify (units) {
+  function simplify(units) {
     // this turns ['s','m','s'] into ['s2','m']
 
     var unitCounts = units.reduce(function(acc, unit) {
       var unitCounter = acc[unit];
-      if(!unitCounter) {
-        acc.push(unitCounter = acc[unit] = [unit, 0]);
+      if (!unitCounter) {
+        acc.push((unitCounter = acc[unit] = [unit, 0]));
       }
 
       unitCounter[1]++;
@@ -1222,7 +1295,7 @@ var _=require('lodash');
       return acc;
     }, []);
 
-    return unitCounts.map(function(unitCount) {
+    return arrify(unitCounts).map(function(unitCount) {
       return unitCount[0] + (unitCount[1] > 1 ? unitCount[1] : "");
     });
   }
@@ -1245,139 +1318,145 @@ var _=require('lodash');
   }
 
   function round(val, decimals) {
-    return Math.round(val*Math.pow(10, decimals))/Math.pow(10, decimals);
+    return Math.round(val * Math.pow(10, decimals)) / Math.pow(10, decimals);
   }
 
-  function subtractTemperatures(lhs,rhs) {
+  function subtractTemperatures(lhs, rhs) {
     var lhsUnits = lhs.units();
     var rhsConverted = rhs.to(lhsUnits);
     var dstDegrees = Qty(getDegreeUnits(lhsUnits));
-    return Qty({"scalar": lhs.scalar - rhsConverted.scalar, "numerator": dstDegrees.numerator, "denominator": dstDegrees.denominator});
+    return Qty({
+      scalar: lhs.scalar - rhsConverted.scalar,
+      numerator: dstDegrees.numerator,
+      denominator: dstDegrees.denominator
+    });
   }
 
-  function subtractTempDegrees(temp,deg) {
+  function subtractTempDegrees(temp, deg) {
     var tempDegrees = deg.to(getDegreeUnits(temp.units()));
-    return Qty({"scalar": temp.scalar - tempDegrees.scalar, "numerator": temp.numerator, "denominator": temp.denominator});
+    return Qty({
+      scalar: temp.scalar - tempDegrees.scalar,
+      numerator: temp.numerator,
+      denominator: temp.denominator
+    });
   }
 
-  function addTempDegrees(temp,deg) {
+  function addTempDegrees(temp, deg) {
     var tempDegrees = deg.to(getDegreeUnits(temp.units()));
-    return Qty({"scalar": temp.scalar + tempDegrees.scalar, "numerator": temp.numerator, "denominator": temp.denominator});
+    return Qty({
+      scalar: temp.scalar + tempDegrees.scalar,
+      numerator: temp.numerator,
+      denominator: temp.denominator
+    });
   }
 
   function getDegreeUnits(units) {
-    if(units === "tempK") {
+    if (units === "tempK") {
       return "degK";
-    }
-    else if(units === "tempC") {
+    } else if (units === "tempC") {
       return "degC";
-    }
-    else if(units === "tempF") {
+    } else if (units === "tempF") {
       return "degF";
-    }
-    else if(units === "tempR") {
+    } else if (units === "tempR") {
       return "degR";
-    }
-    else {
+    } else {
       throw new QtyError("Unknown type for temp conversion from: " + units);
     }
   }
 
-  function toDegrees(src,dst) {
+  function toDegrees(src, dst) {
     var srcDegK = toDegK(src);
     var dstUnits = dst.units();
     var dstScalar;
 
-    if(dstUnits === "degK") {
+    if (dstUnits === "degK") {
       dstScalar = srcDegK.scalar;
-    }
-    else if(dstUnits === "degC") {
-      dstScalar = srcDegK.scalar ;
-    }
-    else if(dstUnits === "degF") {
-      dstScalar = srcDegK.scalar * 9/5;
-    }
-    else if(dstUnits === "degR") {
-      dstScalar = srcDegK.scalar * 9/5;
-    }
-    else {
+    } else if (dstUnits === "degC") {
+      dstScalar = srcDegK.scalar;
+    } else if (dstUnits === "degF") {
+      dstScalar = (srcDegK.scalar * 9) / 5;
+    } else if (dstUnits === "degR") {
+      dstScalar = (srcDegK.scalar * 9) / 5;
+    } else {
       throw new QtyError("Unknown type for degree conversion to: " + dstUnits);
     }
 
-    return Qty({"scalar": dstScalar, "numerator": dst.numerator, "denominator": dst.denominator});
+    return Qty({
+      scalar: dstScalar,
+      numerator: dst.numerator,
+      denominator: dst.denominator
+    });
   }
 
   function toDegK(qty) {
     var units = qty.units();
     var q;
-    if(units.match(/(deg)[CFRK]/)) {
+    if (units.match(/(deg)[CFRK]/)) {
       q = qty.baseScalar;
-    }
-    else if(units === "tempK") {
+    } else if (units === "tempK") {
       q = qty.scalar;
-    }
-    else if(units === "tempC") {
+    } else if (units === "tempC") {
       q = qty.scalar;
-    }
-    else if(units === "tempF") {
-      q = qty.scalar * 5/9;
-    }
-    else if(units === "tempR") {
-      q = qty.scalar * 5/9;
-    }
-    else {
+    } else if (units === "tempF") {
+      q = (qty.scalar * 5) / 9;
+    } else if (units === "tempR") {
+      q = (qty.scalar * 5) / 9;
+    } else {
       throw new QtyError("Unknown type for temp conversion from: " + units);
     }
 
-    return Qty({"scalar": q, "numerator": ["<kelvin>"], "denominator": UNITY_ARRAY});
+    return Qty({
+      scalar: q,
+      numerator: ["<kelvin>"],
+      denominator: UNITY_ARRAY
+    });
   }
 
-  function toTemp(src,dst) {
+  function toTemp(src, dst) {
     var dstUnits = dst.units();
     var dstScalar;
 
-    if(dstUnits === "tempK") {
+    if (dstUnits === "tempK") {
       dstScalar = src.baseScalar;
-    }
-    else if(dstUnits === "tempC") {
+    } else if (dstUnits === "tempC") {
       dstScalar = src.baseScalar - 273.15;
-    }
-    else if(dstUnits === "tempF") {
-      dstScalar = (src.baseScalar * 9/5) - 459.67;
-    }
-    else if(dstUnits === "tempR") {
-      dstScalar = src.baseScalar * 9/5;
-    }
-    else {
+    } else if (dstUnits === "tempF") {
+      dstScalar = (src.baseScalar * 9) / 5 - 459.67;
+    } else if (dstUnits === "tempR") {
+      dstScalar = (src.baseScalar * 9) / 5;
+    } else {
       throw new QtyError("Unknown type for temp conversion to: " + dstUnits);
     }
 
-    return Qty({"scalar": dstScalar, "numerator": dst.numerator, "denominator": dst.denominator});
+    return Qty({
+      scalar: dstScalar,
+      numerator: dst.numerator,
+      denominator: dst.denominator
+    });
   }
 
   function toTempK(qty) {
     var units = qty.units();
     var q;
-    if(units.match(/(deg)[CFRK]/)) {
+    if (units.match(/(deg)[CFRK]/)) {
       q = qty.baseScalar;
-    }
-    else if(units === "tempK") {
+    } else if (units === "tempK") {
       q = qty.scalar;
-    }
-    else if(units === "tempC") {
+    } else if (units === "tempC") {
       q = qty.scalar + 273.15;
-    }
-    else if(units === "tempF") {
-      q = (qty.scalar + 459.67) * 5/9;
-    }
-    else if(units === "tempR") {
-      q = qty.scalar * 5/9;
-    }
-    else {
+    } else if (units === "tempF") {
+      q = ((qty.scalar + 459.67) * 5) / 9;
+    } else if (units === "tempR") {
+      q = (qty.scalar * 5) / 9;
+    } else {
       throw new QtyError("Unknown type for temp conversion from: " + units);
     }
 
-    return Qty({"scalar": q, "numerator": ["<temp-K>"], "denominator": UNITY_ARRAY});
+    return Qty({
+      scalar: q,
+      numerator: ["<temp-K>"],
+      denominator: UNITY_ARRAY
+    });
   }
 
   /**
@@ -1388,8 +1467,9 @@ var _=require('lodash');
    * @param {...number} number
    */
   function mulSafe() {
-    var result = 1, decimals = 0;
-    for(var i = 0; i < arguments.length; i++) {
+    var result = 1,
+      decimals = 0;
+    for (var i = 0; i < arguments.length; i++) {
       var arg = arguments[i];
       decimals = decimals + getFractional(arg);
       result *= arg;
@@ -1407,26 +1487,26 @@ var _=require('lodash');
    * @param {number} den Denominator
    */
   function divSafe(num, den) {
-    if(den === 0) {
+    if (den === 0) {
       throw new QtyError("Divide by zero");
     }
 
     var factor = Math.pow(10, getFractional(den));
-    var invDen = factor/(factor*den);
+    var invDen = factor / (factor * den);
 
     return mulSafe(num, invDen);
   }
 
   function getFractional(num) {
     // Check for NaNs or Infinities
-    if(!isFinite(num)) {
+    if (!isFinite(num)) {
       return 0;
     }
 
     // Faster than parsing strings
     // http://jsperf.com/count-decimals/2
     var count = 0;
-    while(num % 1 !== 0) {
+    while (num % 1 !== 0) {
       num *= 10;
       count++;
     }
@@ -1437,43 +1517,43 @@ var _=require('lodash');
   Qty.divSafe = divSafe;
 
   function cleanTerms(num, den) {
-    num = num.filter(function(val) {return val !== UNITY;});
-    den = den.filter(function(val) {return val !== UNITY;});
+    num = num.filter(function(val) {
+      return val !== UNITY;
+    });
+    den = den.filter(function(val) {
+      return val !== UNITY;
+    });
 
     var combined = {};
 
     var k;
-    for(var i = 0; i < num.length; i++) {
-      if(PREFIX_VALUES[num[i]]) {
-        k = [num[i], num[i+1]];
+    for (var i = 0; i < num.length; i++) {
+      if (PREFIX_VALUES[num[i]]) {
+        k = [num[i], num[i + 1]];
         i++;
-      }
-      else {
+      } else {
         k = num[i];
       }
-      if(k && k !== UNITY) {
-        if(combined[k]) {
+      if (k && k !== UNITY) {
+        if (combined[k]) {
           combined[k][0]++;
-        }
-        else {
+        } else {
           combined[k] = [1, k];
         }
       }
     }
 
-    for(var j = 0; j < den.length; j++) {
-      if(PREFIX_VALUES[den[j]]) {
-        k = [den[j], den[j+1]];
+    for (var j = 0; j < den.length; j++) {
+      if (PREFIX_VALUES[den[j]]) {
+        k = [den[j], den[j + 1]];
         j++;
-      }
-      else {
+      } else {
         k = den[j];
       }
-      if(k && k !== UNITY) {
-        if(combined[k]) {
+      if (k && k !== UNITY) {
+        if (combined[k]) {
           combined[k][0]--;
-        }
-        else {
+        } else {
           combined[k] = [-1, k];
         }
       }
@@ -1482,35 +1562,34 @@ var _=require('lodash');
     num = [];
     den = [];
 
-    for(var prop in combined) {
-      if(combined.hasOwnProperty(prop)) {
+    for (var prop in combined) {
+      if (combined.hasOwnProperty(prop)) {
         var item = combined[prop];
         var n;
-        if(item[0] > 0) {
-          for(n = 0; n < item[0]; n++) {
+        if (item[0] > 0) {
+          for (n = 0; n < item[0]; n++) {
             num.push(item[1]);
           }
-        }
-        else if(item[0] < 0) {
-          for(n = 0; n < -item[0]; n++) {
+        } else if (item[0] < 0) {
+          for (n = 0; n < -item[0]; n++) {
             den.push(item[1]);
           }
         }
       }
     }
 
-    if(num.length === 0) {
+    if (num.length === 0) {
       num = UNITY_ARRAY;
     }
-    if(den.length === 0) {
+    if (den.length === 0) {
       den = UNITY_ARRAY;
     }
 
     // Flatten
-    num = num.reduce(function(a,b) {
+    num = num.reduce(function(a, b) {
       return a.concat(b);
     }, []);
-    den = den.reduce(function(a,b) {
+    den = den.reduce(function(a, b) {
       return a.concat(b);
     }, []);
 
@@ -1583,9 +1662,18 @@ var _=require('lodash');
    * @throws {QtyError} if initialization value type is not valid
    */
   function assertValidInitializationValueType(value) {
-    if (!(isString(value) || isNumber(value) || isQty(value) || isDefinitionObject(value))) {
-      throw new QtyError("Only strings, numbers or quantities " +
-                         "accepted as initialization values");
+    if (
+      !(
+        isString(value) ||
+        isNumber(value) ||
+        isQty(value) ||
+        isDefinitionObject(value)
+      )
+    ) {
+      throw new QtyError(
+        "Only strings, numbers or quantities " +
+          "accepted as initialization values"
+      );
     }
   }
 
@@ -1595,42 +1683,44 @@ var _=require('lodash');
   var UNIT_VALUES = {};
   var UNIT_MAP = {};
   var OUTPUT_MAP = {};
-  for(var unitDef in UNITS) {
-    if(UNITS.hasOwnProperty(unitDef)) {
+  for (var unitDef in UNITS) {
+    if (UNITS.hasOwnProperty(unitDef)) {
       var definition = UNITS[unitDef];
-      if(definition[2] === "prefix") {
+      if (definition[2] === "prefix") {
         PREFIX_VALUES[unitDef] = definition[1];
-        for(var i = 0; i < definition[0].length; i++) {
+        for (var i = 0; i < definition[0].length; i++) {
           PREFIX_MAP[definition[0][i]] = unitDef;
         }
-      }
-      else {
+      } else {
         UNIT_VALUES[unitDef] = {
           scalar: definition[1],
           numerator: definition[3],
           denominator: definition[4]
         };
-        for(var j = 0; j < definition[0].length; j++) {
+        for (var j = 0; j < definition[0].length; j++) {
           UNIT_MAP[definition[0][j]] = unitDef;
         }
       }
       OUTPUT_MAP[unitDef] = definition[0][0];
     }
   }
-  var PREFIX_REGEX = Object.keys(PREFIX_MAP).sort(function(a, b) {
-    return b.length - a.length;
-  }).join("|");
-  var UNIT_REGEX = Object.keys(UNIT_MAP).sort(function(a, b) {
-    return b.length - a.length;
-  }).join("|");
+  var PREFIX_REGEX = Object.keys(PREFIX_MAP)
+    .sort(function(a, b) {
+      return b.length - a.length;
+    })
+    .join("|");
+  var UNIT_REGEX = Object.keys(UNIT_MAP)
+    .sort(function(a, b) {
+      return b.length - a.length;
+    })
+    .join("|");
   /*
    * Minimal boundary regex to support units with Unicode characters
    * \b only works for ASCII
    */
   var BOUNDARY_REGEX = "\\b|$";
-  var UNIT_MATCH = "(" + PREFIX_REGEX + ")??(" +
-                   UNIT_REGEX +
-                   ")(?:" + BOUNDARY_REGEX + ")";
+  var UNIT_MATCH =
+    "(" + PREFIX_REGEX + ")??(" + UNIT_REGEX + ")(?:" + BOUNDARY_REGEX + ")";
   var UNIT_MATCH_REGEX = new RegExp(UNIT_MATCH, "g"); // g flag for multiple occurences
   var UNIT_TEST_REGEX = new RegExp("^\\s*(" + UNIT_MATCH + "\\s*\\*?\\s*)+$");
 
@@ -1641,7 +1731,8 @@ var _=require('lodash');
 
   function QtyError() {
     var err;
-    if(!this) { // Allows to instantiate QtyError without new()
+    if (!this) {
+      // Allows to instantiate QtyError without new()
       err = Object.create(QtyError.prototype);
       QtyError.apply(err, arguments);
       return err;
@@ -1651,8 +1742,10 @@ var _=require('lodash');
     this.message = err.message;
     this.stack = err.stack;
   }
-  QtyError.prototype = Object.create(Error.prototype, {constructor: { value: QtyError }});
+  QtyError.prototype = Object.create(Error.prototype, {
+    constructor: { value: QtyError }
+  });
   Qty.Error = QtyError;
 
   return Qty;
-}));
+});
