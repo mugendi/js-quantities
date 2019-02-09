@@ -36,7 +36,7 @@ const _ = require("lodash"),
 })(this, function() {
   "use strict";
 
-  var UNITS = require("./data/units.js");
+  const UNITS = require("./data/units.js");
 
   var BASE_UNITS = [
     "<meter>",
@@ -153,6 +153,7 @@ const _ = require("lodash"),
 
     if (isDefinitionObject(initValue)) {
       this.scalar = initValue.scalar;
+      
       this.numerator =
         initValue.numerator && initValue.numerator.length !== 0
           ? initValue.numerator
@@ -164,6 +165,9 @@ const _ = require("lodash"),
     } else {
       parse.call(this, initValue);
     }
+
+
+    // console.log(this.denominator);
 
     // math with temperatures is very limited
     if (
@@ -403,6 +407,8 @@ const _ = require("lodash"),
    * 8 lbs 8 oz -- recognized as 8 lbs + 8 ounces
    */
   var parse = function(val) {
+
+    
     if (!isString(val)) {
       val = val.toString();
     }
@@ -840,6 +846,7 @@ const _ = require("lodash"),
       }
 
       cached = this._conversionCache[other];
+      // console.log({cached});
       if (cached) {
         return cached;
       }
@@ -888,13 +895,19 @@ const _ = require("lodash"),
       var units = [];
       var numerator = this.numerator.pop();
 
-      all_units[this._units] = arrify(UNITS[numerator])[0];
+      if(!numerator){
+        return []
+      }
+
+      // console.log(UNITS[numerator][0]);
+      all_units[this._units] = UNITS[numerator][0];
 
       //loop thru all the available UNITs
       for (var key in UNITS) {
         //only use UNITS with matching signatures
         if (signature == UNITS[key][2]) {
-          unit = arrify(UNITS[key][0])[0];
+
+          unit = UNITS[key][0][0];
 
           //if compatible unit
           if (this.isCompatible(unit)) {
@@ -1160,8 +1173,10 @@ const _ = require("lodash"),
    *
    */
   function parseUnits(units) {
+    // console.log({units});
     var cached = parsedUnitsCache[units];
-    if (cached) {
+    // console.log(cached);
+    if (cached && cached.length) {
       return cached;
     }
 
@@ -1176,7 +1191,7 @@ const _ = require("lodash"),
       normalizedUnits.push(unitMatch.slice(1));
     }
 
-    normalizedUnits = arrify(normalizedUnits).map(function(item) {
+    normalizedUnits = normalizedUnits.map(function(item) {
       return PREFIX_MAP[item[0]]
         ? [PREFIX_MAP[item[0]], UNIT_MAP[item[1]]]
         : [UNIT_MAP[item[1]]];
@@ -1299,7 +1314,7 @@ const _ = require("lodash"),
       return acc;
     }, []);
 
-    return arrify(unitCounts).map(function(unitCount) {
+    return unitCounts.map(function(unitCount) {
       return unitCount[0] + (unitCount[1] > 1 ? unitCount[1] : "");
     });
   }
