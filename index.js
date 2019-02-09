@@ -374,7 +374,7 @@ const _ = require("lodash"),
       vector[i] = 0;
     }
     var r, n;
-    for (var j = 0; j < this.numerator.length; j++) {
+    for (var j = 0; j < arrify(this.numerator).length; j++) {
       if ((r = UNITS[this.numerator[j]])) {
         n = SIGNATURE_VECTOR.indexOf(r[2]);
         if (n >= 0) {
@@ -569,7 +569,7 @@ const _ = require("lodash"),
         return this._isBase;
       }
 
-      this.numerator.concat(this.denominator).forEach(function(item) {
+      arrify(this.numerator).concat(this.denominator).forEach(function(item) {
         if (item !== UNITY && BASE_UNITS.indexOf(item) === -1) {
           this._isBase = false;
         }
@@ -807,7 +807,7 @@ const _ = require("lodash"),
       // signature may not have been calculated yet
       return (
         (this.signature === null || this.signature === 400) &&
-        this.numerator.length === 1 &&
+        arrify(this.numerator).length === 1 &&
         compareArray(this.denominator, UNITY_ARRAY) &&
         (this.numerator[0].match(/<temp-[CFRK]>/) ||
           this.numerator[0].match(/<(kelvin|celsius|rankine|fahrenheit)>/))
@@ -893,7 +893,7 @@ const _ = require("lodash"),
       var all_units = {};
       var unit = this.initValue.replace(/[^a-z]+/gi, "");
       var units = [];
-      var numerator = this.numerator.pop();
+      var numerator = arrify(this.numerator).pop();
 
       if(!numerator){
         return []
@@ -1182,9 +1182,12 @@ const _ = require("lodash"),
 
     var unitMatch,
       normalizedUnits = [];
+
+      // console.log(units);
     // Scan
     if (!UNIT_TEST_REGEX.test(units)) {
-      throw new QtyError("Unit not recognized");
+      // throw new QtyError("Unit not recognized");
+      return null
     }
 
     while ((unitMatch = UNIT_MATCH_REGEX.exec(units))) {
@@ -1206,6 +1209,9 @@ const _ = require("lodash"),
     });
 
     parsedUnitsCache[units] = normalizedUnits;
+
+    // console.log({normalizedUnits});
+    
 
     return normalizedUnits;
   }
