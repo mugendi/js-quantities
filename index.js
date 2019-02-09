@@ -11,8 +11,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 /*jshint eqeqeq:true, immed:true, undef:true */
 /*global module:false, define:false */
 
+require('sugar')
+
 const _ = require("lodash"),
   arrify = require("arrify");
+
+
 
 (function(root, factory) {
   "use strict";

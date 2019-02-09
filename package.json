@@ -1,6 +1,6 @@
 {
-  "name": "js-quantities-all",
-  "version": "1.0.1",
+  "name": "parse-quantities",
+  "version": "0.0.5",
   "description": "Expand a string with quantities",
   "main": "index.js",
   "scripts": {
